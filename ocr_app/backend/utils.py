@@ -5,6 +5,8 @@ import fitz              # PyMuPDF
 from docx import Document
 from ebooklib import epub
 import subprocess
+from html import escape
+import numpy as np
 
 def process_images(workdir, image_paths):
     output_dir = os.path.join(workdir, "output")
@@ -16,11 +18,13 @@ def process_images(workdir, image_paths):
     # Processamento de cada imagem
     for path in sorted(image_paths):
         img = cv2.imread(path)
+        if img is None:
+            raise ValueError("Não foi possível abrir uma das imagens enviadas")
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         gray = cv2.equalizeHist(gray)
         blur = cv2.GaussianBlur(gray, (3, 3), 0)
         _, th = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        sharp = cv2.filter2D(th, -1, [[0, -1, 0], [-1, 5, -1], [0, -1, 0]])
+        sharp = cv2.filter2D(th, -1, np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]]))
 
         tmp = path + "_tmp.png"
         cv2.imwrite(tmp, sharp)
@@ -54,7 +58,7 @@ def process_images(workdir, image_paths):
     book.set_title("Livro OCR")
     book.add_author("Book.converter")
     chapter = epub.EpubHtml(title="OCR", file_name="ocr.xhtml", lang="pt")
-    chapter.content = f"<pre>{full_text}</pre>"
+    chapter.content = f"<pre>{escape(full_text)}</pre>"
     book.add_item(chapter)
     book.toc = (epub.Link("ocr.xhtml", "OCR", "o1"),)
     book.add_item(epub.EpubNcx())
@@ -73,3 +77,4 @@ def process_images(workdir, image_paths):
     except FileNotFoundError:
         # ebook-convert não encontrado; apenas ignora
         pass
+
